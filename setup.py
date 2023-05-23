@@ -22,7 +22,7 @@ def read_file(filepath: str) -> str:
 
 extras_require = {
     "box2d": [
-        "gym[box2d]==0.24.1",
+        "gymnasium[box2d]>=0.27.1",
     ],
     "brax": [
         "brax>=0.0.10,<=0.0.16",
@@ -30,6 +30,9 @@ extras_require = {
     ],
     "dm_control": [
         "dm_control>=1.0.3",
+    ],
+    "gymnax": [
+        "gymnax>=0.0.6",
     ],
     "mario": [
         "torch>=1.9.0",
@@ -76,7 +79,7 @@ setuptools.setup(
     include_package_data=True,
     python_requires=">=3.9",
     install_requires=[
-        "gym==0.24.1",
+        "gymnasium>=0.27.1",
         "scipy>=1.7.0",
         "ConfigArgParse>=1.5.1",
         "numpy>=1.19.5",
@@ -94,9 +97,6 @@ setuptools.setup(
     extras_require=extras_require,
     test_suite="pytest",
     platforms=["Linux"],
-    entry_points={
-        "console_scripts": ["smac = smac.smac_cli:cmd_line_call"],
-    },
     classifiers=[
      "Programming Language :: Python :: 3",
      "Natural Language :: English",

@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Union
 
-import gymnasium.envs.classic_control as gccenvs
-import numpy as np
+from gymnax.environments.classic_control.pendulum import EnvParams, Pendulum
+import jax.numpy as jnp
 
 from carl.context.selection import AbstractSelector
 from carl.envs.carl_env import CARLEnv
@@ -10,53 +10,29 @@ from carl.utils.types import Context, Contexts
 
 DEFAULT_CONTEXT = {
     "max_speed": 8.0,
+    "max_torque": 2.0,
     "dt": 0.05,
     "g": 10.0,
     "m": 1.0,
     "l": 1.0,
-    "initial_angle_max": np.pi,  # Upper bound for uniform distribution to sample from
-    "initial_velocity_max": 1,  # Upper bound for uniform distribution to sample from
-    # The lower bound will be the negative value.
+    "max_steps_in_episode": 200,
 }
 
 CONTEXT_BOUNDS = {
-    "max_speed": (-np.inf, np.inf, float),
-    "dt": (0, np.inf, float),
-    "g": (0, np.inf, float),
-    "m": (1e-6, np.inf, float),
-    "l": (1e-6, np.inf, float),
-    "initial_angle_max": (0, np.inf, float),
-    "initial_velocity_max": (0, np.inf, float),
+    "max_speed": (-jnp.inf, jnp.inf, float),
+    "max_torque": (-jnp.inf, jnp.inf, float),
+    "dt": (0, jnp.inf, float),
+    "g": (0, jnp.inf, float),
+    "m": (1e-6, jnp.inf, float),
+    "l": (1e-6, jnp.inf, float),
+    "max_steps_in_episode": (1, jnp.inf, int),
 }
 
 
-class CustomPendulum(gccenvs.pendulum.PendulumEnv):
-    def __init__(self, g: float = 10.0):
-        super(CustomPendulum, self).__init__(g=g)
-        self.initial_angle_max = DEFAULT_CONTEXT["initial_angle_max"]
-        self.initial_velocity_max = DEFAULT_CONTEXT["initial_velocity_max"]
-
-    def reset(
-        self,
-        *,
-        seed: Optional[int] = None,
-        return_info: bool = False,
-        options: Optional[dict] = None,
-    ) -> Union[np.ndarray, tuple[np.ndarray, dict]]:
-        super().reset(seed=seed)
-        high = np.array([self.initial_angle_max, self.initial_velocity_max])
-        self.state = self.np_random.uniform(low=-high, high=high)
-        self.last_u = None
-        if not return_info:
-            return self._get_obs()
-        else:
-            return self._get_obs(), {}
-
-
-class CARLPendulumEnv(CARLEnv):
+class CARLJaxPendulumEnv(CARLEnv):
     def __init__(
         self,
-        env: CustomPendulum = CustomPendulum(),
+        env: Pendulum = Pendulum(),
         contexts: Contexts = {},
         hide_context: bool = True,
         add_gaussian_noise_to_context: bool = False,
@@ -108,14 +84,7 @@ class CARLPendulumEnv(CARLEnv):
         )  # allow to augment all values
 
     def _update_context(self) -> None:
-        self.env: CustomPendulum
-        self.env.max_speed = self.context["max_speed"]
-        self.env.dt = self.context["dt"]
-        self.env.l = self.context["l"]  # noqa: E741 ambiguous variable name
-        self.env.m = self.context["m"]
-        self.env.g = self.context["g"]
-        self.env.initial_angle_max = self.context["initial_angle_max"]
-        self.env.initial_velocity_max = self.context["initial_velocity_max"]
+        self.env_params = EnvParams(**self.context)
 
-        high = np.array([1.0, 1.0, self.max_speed], dtype=np.float32)
+        high = jnp.array([1.0, 1.0, self.max_speed], dtype=jnp.float32)
         self.build_observation_space(-high, high, CONTEXT_BOUNDS)

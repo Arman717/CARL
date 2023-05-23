@@ -1,7 +1,8 @@
 from typing import Dict, List, Optional, Union
 
+import jax.numpy as jnp
 import numpy as np
-from gymnasium.envs.classic_control import AcrobotEnv
+from gymnax.environments.classic_control.acrobot import Acrobot
 
 from carl.context.selection import AbstractSelector
 from carl.envs.carl_env import CARLEnv
@@ -9,20 +10,15 @@ from carl.utils.trial_logger import TrialLogger
 from carl.utils.types import Context, Contexts
 
 DEFAULT_CONTEXT = {
-    "link_length_1": 1,  # should be seen as 100% default and scaled
-    "link_length_2": 1,  # should be seen as 100% default and scaled
-    "link_mass_1": 1,  # should be seen as 100% default and scaled
-    "link_mass_2": 1,  # should be seen as 100% default and scaled
-    "link_com_1": 0.5,  # Percentage of the length of link one
-    "link_com_2": 0.5,  # Percentage of the length of link one
-    "link_moi": 1,  # should be seen as 100% default and scaled
-    "max_velocity_1": 4 * np.pi,
-    "max_velocity_2": 9 * np.pi,
-    "torque_noise_max": 0.0,  # optional noise on torque, sampled uniformly from [-torque_noise_max, torque_noise_max]
-    "initial_angle_lower": -0.1,  # lower bound of initial angle distribution (uniform)
-    "initial_angle_upper": 0.1,  # upper bound of initial angle distribution (uniform)
-    "initial_velocity_lower": -0.1,  # lower bound of initial velocity distribution (uniform)
-    "initial_velocity_upper": 0.1,  # upper bound of initial velocity distribution (uniform)
+    "link_length_1": 1,
+    "link_length_2": 1,
+    "link_mass_1": 1,
+    "link_mass_2": 1,
+    "link_com_1": 0.5,
+    "link_com_2": 0.5,
+    "link_moi": 1,
+    "max_velocity_1": 4 * jnp.pi,
+    "max_velocity_2": 9 * jnp.pi,
 }
 
 CONTEXT_BOUNDS = {
@@ -56,50 +52,17 @@ CONTEXT_BOUNDS = {
         1.0,
         float,
     ),  # torque is either {-1., 0., 1}. Applying noise of 1. would be quite extreme
-    "initial_angle_lower": (-np.inf, np.inf, float),
-    "initial_angle_upper": (-np.inf, np.inf, float),
-    "initial_velocity_lower": (-np.inf, np.inf, float),
-    "initial_velocity_upper": (-np.inf, np.inf, float),
+    "initial_angle_lower": (-jnp.inf, jnp.inf, float),
+    "initial_angle_upper": (-jnp.inf, jnp.inf, float),
+    "initial_velocity_lower": (-jnp.inf, jnp.inf, float),
+    "initial_velocity_upper": (-jnp.inf, jnp.inf, float),
 }
 
 
-class CustomAcrobotEnv(AcrobotEnv):
-    INITIAL_ANGLE_LOWER: float = -0.1
-    INITIAL_ANGLE_UPPER: float = 0.1
-    INITIAL_VELOCITY_LOWER: float = -0.1
-    INITIAL_VELOCITY_UPPER: float = 0.1
-
-    def reset(
-        self,
-        *,
-        seed: Optional[int] = None,
-        return_info: bool = False,
-        options: Optional[dict] = None,
-    ) -> Union[np.ndarray, tuple[np.ndarray, dict]]:
-        super().reset(seed=seed)
-        low = (
-            self.INITIAL_ANGLE_LOWER,
-            self.INITIAL_ANGLE_LOWER,
-            self.INITIAL_VELOCITY_LOWER,
-            self.INITIAL_VELOCITY_LOWER,
-        )
-        high = (
-            self.INITIAL_ANGLE_UPPER,
-            self.INITIAL_ANGLE_UPPER,
-            self.INITIAL_VELOCITY_UPPER,
-            self.INITIAL_VELOCITY_UPPER,
-        )
-        self.state = self.np_random.uniform(low=low, high=high).astype(np.float32)
-        if not return_info:
-            return self._get_ob()
-        else:
-            return self._get_ob(), {}
-
-
-class CARLAcrobotEnv(CARLEnv):
+class CARLJaxAcrobotEnv(CARLEnv):
     def __init__(
         self,
-        env: CustomAcrobotEnv = CustomAcrobotEnv(),
+        env: Acrobot = Acrobot(),
         contexts: Contexts = {},
         hide_context: bool = True,
         add_gaussian_noise_to_context: bool = False,
@@ -139,7 +102,7 @@ class CARLAcrobotEnv(CARLEnv):
         )  # allow to augment all values
 
     def _update_context(self) -> None:
-        self.env: CustomAcrobotEnv
+        self.env: Acrobot
         self.env.LINK_LENGTH_1 = self.context["link_length_1"]
         self.env.LINK_LENGTH_2 = self.context["link_length_2"]
         self.env.LINK_MASS_1 = self.context["link_mass_1"]
@@ -149,15 +112,10 @@ class CARLAcrobotEnv(CARLEnv):
         self.env.LINK_MOI = self.context["link_moi"]
         self.env.MAX_VEL_1 = self.context["max_velocity_1"]
         self.env.MAX_VEL_2 = self.context["max_velocity_2"]
-        self.env.torque_noise_max = self.context["torque_noise_max"]
-        self.env.INITIAL_ANGLE_LOWER = self.context["initial_angle_lower"]
-        self.env.INITIAL_ANGLE_UPPER = self.context["initial_angle_upper"]
-        self.env.INITIAL_VELOCITY_LOWER = self.context["initial_velocity_lower"]
-        self.env.INITIAL_VELOCITY_UPPER = self.context["initial_velocity_upper"]
 
-        high = np.array(
+        high = jnp.array(
             [1.0, 1.0, 1.0, 1.0, self.env.MAX_VEL_1, self.env.MAX_VEL_2],
-            dtype=np.float32,
+            dtype=jnp.float32,
         )
         low = -high
         self.build_observation_space(low, high, CONTEXT_BOUNDS)

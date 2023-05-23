@@ -1,7 +1,7 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Union
 
-import gymnasium.envs.classic_control as gccenvs
-import numpy as np
+import jax.numpy as jnp
+from gymnax.environments.classic_control.mountain_car import MountainCar
 
 from carl.context.selection import AbstractSelector
 from carl.envs.carl_env import CARLEnv
@@ -16,76 +16,23 @@ DEFAULT_CONTEXT = {
     "goal_velocity": 0,  # unit?
     "force": 0.001,  # unit?
     "gravity": 0.0025,  # unit?
-    "min_position_start": -0.6,
-    "max_position_start": -0.4,
-    "min_velocity_start": 0.0,
-    "max_velocity_start": 0.0,
 }
 
 CONTEXT_BOUNDS = {
-    "min_position": (-np.inf, np.inf, float),
-    "max_position": (-np.inf, np.inf, float),
-    "max_speed": (0, np.inf, float),
-    "goal_position": (-np.inf, np.inf, float),
-    "goal_velocity": (-np.inf, np.inf, float),
-    "force": (-np.inf, np.inf, float),
-    "gravity": (0, np.inf, float),
-    "min_position_start": (-np.inf, np.inf, float),
-    "max_position_start": (-np.inf, np.inf, float),
-    "min_velocity_start": (-np.inf, np.inf, float),
-    "max_velocity_start": (-np.inf, np.inf, float),
+    "min_position": (-jnp.inf, jnp.inf, float),
+    "max_position": (-jnp.inf, jnp.inf, float),
+    "max_speed": (0, jnp.inf, float),
+    "goal_position": (-jnp.inf, jnp.inf, float),
+    "goal_velocity": (-jnp.inf, jnp.inf, float),
+    "force": (-jnp.inf, jnp.inf, float),
+    "gravity": (0, jnp.inf, float),
 }
 
 
-class CustomMountainCarEnv(gccenvs.mountain_car.MountainCarEnv):
-    def __init__(self, goal_velocity: float = 0.0):
-        super(CustomMountainCarEnv, self).__init__(goal_velocity=goal_velocity)
-        self.min_position_start = -0.6
-        self.max_position_start = -0.4
-        self.min_velocity_start = 0.0
-        self.max_velocity_start = 0.0
-        self.state: np.ndarray  # type: ignore [assignment]
-
-    def sample_initial_state(self) -> np.ndarray:
-        return np.array(
-            [
-                self.np_random.uniform(
-                    low=self.min_position_start, high=self.max_position_start
-                ),
-                self.np_random.uniform(
-                    low=self.min_velocity_start, high=self.max_velocity_start
-                ),
-            ]
-        )
-
-    def reset(
-        self,
-        *,
-        seed: Optional[int] = None,
-        return_info: bool = False,
-        options: Optional[dict] = None,
-    ) -> Union[np.ndarray, tuple[np.ndarray, dict]]:
-        super().reset(seed=seed)
-        self.state = self.sample_initial_state()
-        if not return_info:
-            return np.array(self.state, dtype=np.float32)
-        else:
-            return np.array(self.state, dtype=np.float32), {}
-
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict]:
-        state, reward, done, info = super().step(action)
-        return (
-            state.squeeze(),
-            reward,
-            done,
-            info,
-        )  # TODO something weird is happening such that the state gets shape (2,1) instead of (2,)
-
-
-class CARLMountainCarEnv(CARLEnv):
+class CARLJaxMountainCarEnv(CARLEnv):
     def __init__(
         self,
-        env: CustomMountainCarEnv = CustomMountainCarEnv(),
+        env: MountainCar = MountainCar(),
         contexts: Contexts = {},
         hide_context: bool = True,
         add_gaussian_noise_to_context: bool = False,
@@ -135,7 +82,7 @@ class CARLMountainCarEnv(CARLEnv):
         )  # allow to augment all values
 
     def _update_context(self) -> None:
-        self.env: CustomMountainCarEnv
+        self.env: CARLJaxMountainCarEnv
         self.env.min_position = self.context["min_position"]
         self.env.max_position = self.context["max_position"]
         self.env.max_speed = self.context["max_speed"]
@@ -148,11 +95,11 @@ class CARLMountainCarEnv(CARLEnv):
         self.env.force = self.context["force"]
         self.env.gravity = self.context["gravity"]
 
-        self.low = np.array(
-            [self.env.min_position, -self.env.max_speed], dtype=np.float32
+        self.low = jnp.array(
+            [self.env.min_position, -self.env.max_speed], dtype=jnp.float32
         ).squeeze()
-        self.high = np.array(
-            [self.env.max_position, self.env.max_speed], dtype=np.float32
+        self.high = jnp.array(
+            [self.env.max_position, self.env.max_speed], dtype=jnp.float32
         ).squeeze()
 
         self.build_observation_space(self.low, self.high, CONTEXT_BOUNDS)
